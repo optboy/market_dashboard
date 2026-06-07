@@ -12,8 +12,11 @@ def load_index_scores(path: Path = PROCESSED_SCORE_PATH) -> pd.DataFrame:
         return pd.DataFrame(
             columns=[
                 "market",
+                "asset_type",
                 "index_id",
                 "name",
+                "symbol",
+                "market_cap",
                 "last_date",
                 "last_price",
                 "change_pct",

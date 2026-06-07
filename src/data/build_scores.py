@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.data.index_config import load_indices
 from src.data.processed import PROCESSED_SCORE_PATH
 from src.data.storage import load_raw_index_data
+from src.data.universe import load_asset_universe
 from src.indicators.technical import add_all_indicators
 from src.scoring.rules import score_latest_row
 
@@ -24,20 +24,34 @@ def build_index_scores() -> pd.DataFrame:
     INDICATOR_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     PROCESSED_SCORE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    for index in load_indices():
-        raw = load_raw_index_data(index["id"])
-        indicators = add_all_indicators(_prepare_raw_data(raw))
-        indicators.to_csv(INDICATOR_OUTPUT_DIR / f"{index['id']}.csv", index=False)
+    universe = load_asset_universe()
+    for asset in universe.to_dict("records"):
+        try:
+            raw = load_raw_index_data(asset["asset_id"])
+        except FileNotFoundError:
+            print(f"skip {asset['asset_id']}: raw data not found")
+            continue
 
-        latest = indicators.dropna(subset=["close"]).iloc[-1]
-        previous = indicators.dropna(subset=["close"]).iloc[-2]
+        indicators = add_all_indicators(_prepare_raw_data(raw))
+        valid_rows = indicators.dropna(subset=["close"])
+        if len(valid_rows) < 2:
+            print(f"skip {asset['asset_id']}: not enough price data")
+            continue
+
+        indicators.to_csv(INDICATOR_OUTPUT_DIR / f"{asset['asset_id']}.csv", index=False)
+
+        latest = valid_rows.iloc[-1]
+        previous = valid_rows.iloc[-2]
         score = score_latest_row(latest, previous)
 
         rows.append(
             {
-                "market": index["market"],
-                "index_id": index["id"],
-                "name": index["name"],
+                "market": asset["market"],
+                "asset_type": asset.get("asset_type", "index"),
+                "index_id": asset["asset_id"],
+                "name": asset["name"],
+                "symbol": asset["symbol"],
+                "market_cap": asset.get("market_cap"),
                 "last_date": latest["date"],
                 "last_price": latest["close"],
                 "change_pct": _calculate_change_pct(latest, previous),

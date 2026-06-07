@@ -28,6 +28,17 @@ def fetch_index_ohlcv(index: dict, start_date: date, end_date: date) -> pd.DataF
         raise
 
 
+def fetch_asset_ohlcv(asset: dict, start_date: date, end_date: date) -> pd.DataFrame:
+    """Fetch OHLCV data for an index or stock asset."""
+    asset_type = asset.get("asset_type", "index")
+    provider = asset["data_provider"]
+    symbol = asset["symbol"]
+
+    if asset_type == "stock" and provider == "pykrx":
+        return fetch_pykrx_stock_ohlcv(symbol, start_date, end_date)
+    return fetch_index_ohlcv(asset, start_date, end_date)
+
+
 def _fetch_with_provider(
     provider: str,
     symbol: str,
@@ -53,6 +64,32 @@ def fetch_pykrx_index_ohlcv(symbol: str, start_date: date, end_date: date) -> pd
     )
     if raw.empty:
         raise ValueError(f"pykrx returned no index data for {symbol}")
+
+    df = raw.reset_index()
+    df = df.rename(
+        columns={
+            "날짜": "date",
+            "시가": "open",
+            "고가": "high",
+            "저가": "low",
+            "종가": "close",
+            "거래량": "volume",
+        }
+    )
+    return _normalize_ohlcv(df)
+
+
+def fetch_pykrx_stock_ohlcv(symbol: str, start_date: date, end_date: date) -> pd.DataFrame:
+    """Fetch Korean stock OHLCV data from pykrx."""
+    from pykrx import stock
+
+    raw = stock.get_market_ohlcv_by_date(
+        start_date.strftime("%Y%m%d"),
+        end_date.strftime("%Y%m%d"),
+        symbol,
+    )
+    if raw.empty:
+        raise ValueError(f"pykrx returned no stock data for {symbol}")
 
     df = raw.reset_index()
     df = df.rename(

@@ -77,6 +77,12 @@ conda activate market_dashboard
 MPLCONFIGDIR=.cache/matplotlib python -m scripts.update_indices
 ```
 
+Download index and stock universe data:
+
+```bash
+MPLCONFIGDIR=.cache/matplotlib python -m scripts.update_assets
+```
+
 Build technical indicators and score data:
 
 ```bash
