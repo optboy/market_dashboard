@@ -1,0 +1,30 @@
+indices:
+  - id: kospi
+    market: Korea
+    name: KOSPI
+    symbol: "1001"
+    data_provider: pykrx
+    fallback_provider: yfinance
+    fallback_symbol: ^KS11
+  - id: kosdaq
+    market: Korea
+    name: KOSDAQ
+    symbol: "2001"
+    data_provider: pykrx
+    fallback_provider: yfinance
+    fallback_symbol: ^KQ11
+  - id: sp500
+    market: US
+    name: S&P 500
+    symbol: ^GSPC
+    data_provider: yfinance
+  - id: nasdaq
+    market: US
+    name: Nasdaq
+    symbol: ^IXIC
+    data_provider: yfinance
+  - id: dow
+    market: US
+    name: Dow Jones Industrial Average
+    symbol: ^DJI
+    data_provider: yfinance
