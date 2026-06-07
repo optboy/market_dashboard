@@ -76,3 +76,15 @@ Download daily index data:
 conda activate market_dashboard
 MPLCONFIGDIR=.cache/matplotlib python -m scripts.update_indices
 ```
+
+Build technical indicators and score data:
+
+```bash
+python -m scripts.build_index_scores
+```
+
+Run the Streamlit app:
+
+```bash
+streamlit run streamlit_app.py
+```

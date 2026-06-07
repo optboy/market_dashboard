@@ -16,5 +16,8 @@ data/raw/*
 data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
+!data/processed/indicators/
+data/processed/indicators/*
+!data/processed/indicators/.gitkeep
 
 *.log

@@ -1,0 +1,33 @@
+thresholds:
+  buy_bias_diff: 20
+  sell_bias_diff: -20
+  rsi_healthy_min: 45
+  rsi_healthy_max: 65
+  rsi_overbought: 70
+  rsi_weak: 40
+  rsi_oversold: 30
+  high_volume_ratio: 1.0
+
+weights:
+  trend:
+    close_above_ma20: 10
+    ma20_above_ma60: 10
+    ma60_above_ma120: 10
+    ma20_slope_up: 5
+  momentum:
+    macd_above_signal: 10
+    macd_above_zero: 5
+    rsi_healthy: 5
+    rsi_direction: 5
+  structure:
+    breakout_20d_high: 8
+    breakdown_20d_low: 8
+    higher_low: 7
+    lower_high: 7
+  volume:
+    up_day_high_volume: 8
+    down_day_high_volume: 8
+    volume_above_ma20: 7
+  volatility:
+    close_above_bb_middle: 5
+    overbought_oversold_risk: 5

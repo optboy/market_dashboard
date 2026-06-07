@@ -53,6 +53,17 @@ def add_volume_average(df: pd.DataFrame, window: int = 20) -> pd.DataFrame:
     return result
 
 
+def add_price_structure(df: pd.DataFrame, window: int = 20) -> pd.DataFrame:
+    """Add rolling high/low and simple slope helpers."""
+    result = df.copy()
+    result["high_20d"] = result["high"].rolling(window=window).max()
+    result["low_20d"] = result["low"].rolling(window=window).min()
+    result["prev_high_20d"] = result["high"].shift(1).rolling(window=window).max()
+    result["prev_low_20d"] = result["low"].shift(1).rolling(window=window).min()
+    result["ma20_slope_5d"] = result["ma20"] - result["ma20"].shift(5)
+    return result
+
+
 def add_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """Add all MVP technical indicators."""
     result = add_moving_averages(df)
@@ -60,4 +71,5 @@ def add_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
     result = add_macd(result)
     result = add_bollinger_bands(result)
     result = add_volume_average(result)
+    result = add_price_structure(result)
     return result

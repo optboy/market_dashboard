@@ -17,27 +17,30 @@
 
 ## Phase 3: Indicators
 
-- [ ] Calculate moving averages: 20, 60, 120 days.
-- [ ] Calculate RSI 14.
-- [ ] Calculate MACD and signal line.
-- [ ] Calculate Bollinger Bands.
-- [ ] Calculate 20-day average volume.
+- [x] Calculate moving averages: 20, 60, 120 days.
+- [x] Calculate RSI 14.
+- [x] Calculate MACD and signal line.
+- [x] Calculate Bollinger Bands.
+- [x] Calculate 20-day average volume.
+- [x] Save indicator data under `data/processed/indicators/`.
 
 ## Phase 4: Rule-Based Scoring
 
-- [ ] Define positive signal weights.
-- [ ] Define negative signal weights.
-- [ ] Generate buy score and sell score.
-- [ ] Generate concise reasons for each score.
-- [ ] Save processed output under `data/processed/`.
+- [x] Define positive signal weights.
+- [x] Define negative signal weights.
+- [x] Generate bullish score and bearish score.
+- [x] Generate concise reasons for each score.
+- [x] Save processed output under `data/processed/`.
+- [x] Show scoring configuration for transparency.
 
 ## Phase 5: Streamlit UI
 
-- [ ] Show index score table.
-- [ ] Add market/index filters.
+- [x] Show index score table.
+- [x] Add market/index filters.
 - [ ] Add detail view per index.
+- [x] Add initial detail view per index.
 - [ ] Add basic charts.
-- [ ] Add update status.
+- [x] Add update status.
 
 ## Phase 6: Private Deployment
 
