@@ -9,6 +9,7 @@ import streamlit as st
 import yaml
 
 from src.data.processed import load_index_scores
+from src.data.r2_storage import download_dataframe, is_r2_configured
 from src.scoring.rules import SCORING_RULES_PATH
 
 
@@ -68,6 +69,14 @@ def load_scores() -> pd.DataFrame:
 
 @st.cache_data
 def load_indicator_data(asset_id: str) -> pd.DataFrame:
+    if is_r2_configured():
+        try:
+            df = download_dataframe(f"indicators/{asset_id}.parquet")
+            df["date"] = pd.to_datetime(df["date"])
+            return df.sort_values("date").reset_index(drop=True)
+        except Exception as exc:
+            print(f"R2 indicator load failed for {asset_id}, falling back to local CSV: {exc}")
+
     path = INDICATOR_DIR / f"{asset_id}.csv"
     if not path.exists():
         return pd.DataFrame()

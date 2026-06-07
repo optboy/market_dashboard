@@ -94,3 +94,15 @@ Run the Streamlit app:
 ```bash
 streamlit run streamlit_app.py
 ```
+
+Upload processed data to Cloudflare R2:
+
+```bash
+export R2_ENDPOINT_URL="https://<account-id>.r2.cloudflarestorage.com"
+export R2_ACCESS_KEY_ID="..."
+export R2_SECRET_ACCESS_KEY="..."
+export R2_BUCKET_NAME="..."
+python -m scripts.upload_processed_to_r2
+```
+
+Streamlit reads from R2 when those environment variables are configured. If they are not configured, it falls back to local files under `data/processed/`.
