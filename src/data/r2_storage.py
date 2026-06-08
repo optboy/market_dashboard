@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from io import BytesIO
 from pathlib import Path
+from typing import Any
 
 import boto3
 import pandas as pd
@@ -15,7 +16,7 @@ MAX_UPLOAD_BYTES = int(os.getenv("R2_MAX_UPLOAD_BYTES", str(8 * 1024**3)))
 
 def is_r2_configured() -> bool:
     return all(
-        os.getenv(name)
+        _setting(name)
         for name in [
             "R2_ENDPOINT_URL",
             "R2_ACCESS_KEY_ID",
@@ -51,17 +52,30 @@ def upload_bytes(payload: bytes, key: str) -> None:
 def _client():
     return boto3.client(
         "s3",
-        endpoint_url=os.environ["R2_ENDPOINT_URL"],
-        aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
-        aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"],
+        endpoint_url=_setting("R2_ENDPOINT_URL"),
+        aws_access_key_id=_setting("R2_ACCESS_KEY_ID"),
+        aws_secret_access_key=_setting("R2_SECRET_ACCESS_KEY"),
         config=Config(signature_version="s3v4"),
         region_name="auto",
     )
 
 
 def _bucket() -> str:
-    return os.environ["R2_BUCKET_NAME"]
+    return str(_setting("R2_BUCKET_NAME"))
 
 
 def _full_key(key: str) -> str:
     return f"{R2_PREFIX}/{key.lstrip('/')}"
+
+
+def _setting(name: str) -> Any:
+    value = os.getenv(name)
+    if value:
+        return value
+
+    try:
+        import streamlit as st
+
+        return st.secrets.get(name)
+    except Exception:
+        return None
