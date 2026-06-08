@@ -9,7 +9,7 @@ import streamlit as st
 import yaml
 
 from src.data.processed import load_index_scores
-from src.data.r2_storage import download_dataframe, is_r2_configured
+from src.data.r2_storage import download_dataframe, is_r2_configured, missing_r2_settings
 from src.scoring.rules import SCORING_RULES_PATH
 
 
@@ -43,6 +43,7 @@ def main() -> None:
             "아직 생성된 분석 결과가 없습니다. "
             "`python -m scripts.build_index_scores`를 실행하면 결과가 표시됩니다."
         )
+        render_data_source_debug(scores)
         return
 
     scores = prepare_scores(scores)
@@ -298,6 +299,20 @@ def render_scoring_popover() -> None:
             for signal, weight in category_weights.items():
                 weights.append({"category": category, "signal": signal, "weight": weight})
         st.dataframe(pd.DataFrame(weights), use_container_width=True, hide_index=True)
+
+
+def render_data_source_debug(scores: pd.DataFrame) -> None:
+    with st.expander("데이터 연결 진단"):
+        st.write(f"R2 configured: `{is_r2_configured()}`")
+        missing = missing_r2_settings()
+        if missing:
+            st.write("Missing R2 settings:")
+            for name in missing:
+                st.write(f"- `{name}`")
+        error = scores.attrs.get("load_error")
+        if error:
+            st.write("Load error:")
+            st.code(error)
 
 
 def build_mini_chart(df: pd.DataFrame, color: str) -> go.Figure:

@@ -15,15 +15,20 @@ MAX_UPLOAD_BYTES = int(os.getenv("R2_MAX_UPLOAD_BYTES", str(8 * 1024**3)))
 
 
 def is_r2_configured() -> bool:
-    return all(
-        _setting(name)
+    return not missing_r2_settings()
+
+
+def missing_r2_settings() -> list[str]:
+    return [
+        name
         for name in [
             "R2_ENDPOINT_URL",
             "R2_ACCESS_KEY_ID",
             "R2_SECRET_ACCESS_KEY",
             "R2_BUCKET_NAME",
         ]
-    )
+        if not _setting(name)
+    ]
 
 
 def upload_dataframe(df: pd.DataFrame, key: str) -> None:
