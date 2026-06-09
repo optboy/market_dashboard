@@ -120,6 +120,7 @@ def fetch_yfinance_index_ohlcv(symbol: str, start_date: date, end_date: date) ->
         end=end_date.isoformat(),
         progress=False,
         auto_adjust=False,
+        timeout=20,
     )
     if isinstance(raw.columns, pd.MultiIndex):
         raw.columns = raw.columns.get_level_values(0)
