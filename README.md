@@ -83,6 +83,12 @@ Download index and stock universe data:
 MPLCONFIGDIR=.cache/matplotlib python -m scripts.update_assets
 ```
 
+This command runs incrementally by default. If `data/raw/<asset_id>.csv` exists, it downloads only rows after the last saved date and appends them. Run a full refresh only when needed:
+
+```bash
+MPLCONFIGDIR=.cache/matplotlib python -m scripts.update_assets --full
+```
+
 Build technical indicators and score data:
 
 ```bash
@@ -113,4 +119,4 @@ Clean local generated files after R2 upload:
 python -m scripts.cleanup_local_data
 ```
 
-This removes `data/raw`, `data/processed/indicators`, and `.cache/yfinance` contents while keeping `index_scores.csv` and `universe.csv` for local fallback. Use `--include-scores` only when you want to remove those fallback files too.
+This removes `data/processed/indicators` and `.cache/yfinance` while keeping `data/raw` for incremental updates. Use `--include-scores` only when you want to remove local fallback score files too. Use `--include-raw` only when you intentionally want to discard local raw history and run a future `update_assets --full`.

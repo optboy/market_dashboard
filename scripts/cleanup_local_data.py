@@ -5,7 +5,6 @@ from pathlib import Path
 
 
 DEFAULT_TARGETS = [
-    Path("data/raw"),
     Path("data/processed/indicators"),
     Path(".cache/yfinance"),
 ]
@@ -18,9 +17,16 @@ def main() -> None:
         action="store_true",
         help="Also remove data/processed/index_scores.csv and universe.csv.",
     )
+    parser.add_argument(
+        "--include-raw",
+        action="store_true",
+        help="Also remove data/raw. This disables incremental updates until a full download is run again.",
+    )
     args = parser.parse_args()
 
     targets = list(DEFAULT_TARGETS)
+    if args.include_raw:
+        targets.append(Path("data/raw"))
     if args.include_scores:
         targets.extend(
             [
