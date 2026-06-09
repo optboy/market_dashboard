@@ -14,13 +14,24 @@ def main() -> None:
 
     scores = pd.read_csv("data/processed/index_scores.csv")
     upload_dataframe(scores, "latest/index_scores.parquet")
+    print("uploaded latest/index_scores.parquet", flush=True)
 
-    for asset_id in scores["index_id"].tolist():
+    asset_ids = scores["index_id"].tolist()
+    uploaded = 0
+    failed = 0
+    for index, asset_id in enumerate(asset_ids, start=1):
         path = f"data/processed/indicators/{asset_id}.csv"
-        indicators = pd.read_csv(path)
-        upload_dataframe(indicators, f"indicators/{asset_id}.parquet")
+        try:
+            indicators = pd.read_csv(path)
+            upload_dataframe(indicators, f"indicators/{asset_id}.parquet")
+            uploaded += 1
+            if index <= 10 or index % 25 == 0:
+                print(f"uploaded {index}/{len(asset_ids)}: {asset_id}", flush=True)
+        except Exception as exc:
+            failed += 1
+            print(f"failed upload {asset_id}: {exc}", flush=True)
 
-    print(f"uploaded scores and {len(scores)} indicator files to R2")
+    print(f"uploaded scores and {uploaded} indicator files to R2; failed {failed}")
 
 
 if __name__ == "__main__":

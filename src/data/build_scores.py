@@ -25,7 +25,8 @@ def build_index_scores() -> pd.DataFrame:
     PROCESSED_SCORE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     universe = load_asset_universe()
-    for asset in universe.to_dict("records"):
+    total_assets = len(universe)
+    for asset_number, asset in enumerate(universe.to_dict("records"), start=1):
         try:
             raw = load_raw_index_data(asset["asset_id"])
         except FileNotFoundError:
@@ -39,6 +40,8 @@ def build_index_scores() -> pd.DataFrame:
             continue
 
         indicators.to_csv(INDICATOR_OUTPUT_DIR / f"{asset['asset_id']}.csv", index=False)
+        if asset_number <= 10 or asset_number % 25 == 0:
+            print(f"processed {asset_number}/{total_assets}: {asset['asset_id']}", flush=True)
 
         latest = valid_rows.iloc[-1]
         previous = valid_rows.iloc[-2]

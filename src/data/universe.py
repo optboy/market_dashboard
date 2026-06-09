@@ -11,6 +11,7 @@ from src.data.index_config import load_indices
 
 UNIVERSE_PATH = Path("data/processed/universe.csv")
 US_SEED_PATH = Path("config/us_seed_symbols.yaml")
+KOREA_SEED_PATH = Path("config/korea_seed_symbols.yaml")
 
 
 def build_asset_universe(per_market_limit: int = 100) -> pd.DataFrame:
@@ -53,12 +54,11 @@ def _index_rows() -> list[dict]:
 def _korean_market_cap_rows(market: str, market_id: str, limit: int) -> list[dict]:
     from pykrx import stock
 
-    target_date = _latest_market_cap_date(market)
-    cap = stock.get_market_cap_by_ticker(target_date.strftime("%Y%m%d"), market=market)
-    cap = cap.sort_values("시가총액", ascending=False).head(limit)
+    symbols = _korean_seed_symbols(market_id, limit)
+    market_caps = {}
 
     rows = []
-    for ticker, item in cap.iterrows():
+    for ticker in symbols:
         rows.append(
             {
                 "asset_id": f"{market_id}_{ticker}",
@@ -69,7 +69,7 @@ def _korean_market_cap_rows(market: str, market_id: str, limit: int) -> list[dic
                 "data_provider": "pykrx",
                 "fallback_provider": None,
                 "fallback_symbol": None,
-                "market_cap": item["시가총액"],
+                "market_cap": market_caps.get(ticker),
             }
         )
     return rows
@@ -79,9 +79,12 @@ def _latest_market_cap_date(market: str) -> date:
     from pykrx import stock
 
     today = date.today()
-    for offset in range(10):
+    for offset in range(365):
         target = today - timedelta(days=offset)
-        cap = stock.get_market_cap_by_ticker(target.strftime("%Y%m%d"), market=market)
+        try:
+            cap = stock.get_market_cap_by_ticker(target.strftime("%Y%m%d"), market=market)
+        except Exception:
+            continue
         if not cap.empty:
             return target
     raise ValueError(f"No market cap data found for {market}")
@@ -95,6 +98,7 @@ def _us_seed_rows(limit: int) -> list[dict]:
     for market_id, config in data["markets"].items():
         symbols = config["symbols"][:limit]
         for symbol in symbols:
+            symbol = str(symbol)
             rows.append(
                 {
                     "asset_id": f"{market_id}_{symbol.replace('-', '_')}",
@@ -109,3 +113,9 @@ def _us_seed_rows(limit: int) -> list[dict]:
                 }
             )
     return rows
+
+
+def _korean_seed_symbols(market_id: str, limit: int) -> list[str]:
+    with KOREA_SEED_PATH.open("r", encoding="utf-8") as file:
+        data = yaml.safe_load(file)
+    return data["markets"][market_id]["symbols"][:limit]

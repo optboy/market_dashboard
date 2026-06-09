@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 import os
+import urllib.error
+import urllib.request
+from email.utils import parsedate_to_datetime
 from io import BytesIO
 from pathlib import Path
 from typing import Any
 
 import boto3
+import botocore.auth
 import pandas as pd
 from botocore.config import Config
 
 
 R2_PREFIX = "market-dashboard"
 MAX_UPLOAD_BYTES = int(os.getenv("R2_MAX_UPLOAD_BYTES", str(8 * 1024**3)))
+_R2_SERVER_DATETIME = None
 
 
 def is_r2_configured() -> bool:
@@ -55,12 +60,18 @@ def upload_bytes(payload: bytes, key: str) -> None:
 
 
 def _client():
+    _patch_botocore_time()
     return boto3.client(
         "s3",
         endpoint_url=_setting("R2_ENDPOINT_URL"),
         aws_access_key_id=_setting("R2_ACCESS_KEY_ID"),
         aws_secret_access_key=_setting("R2_SECRET_ACCESS_KEY"),
-        config=Config(signature_version="s3v4"),
+        config=Config(
+            signature_version="s3v4",
+            connect_timeout=10,
+            read_timeout=30,
+            retries={"max_attempts": 3, "mode": "standard"},
+        ),
         region_name="auto",
     )
 
@@ -71,6 +82,50 @@ def _bucket() -> str:
 
 def _full_key(key: str) -> str:
     return f"{R2_PREFIX}/{key.lstrip('/')}"
+
+
+def _patch_botocore_time() -> None:
+    server_datetime = _r2_server_datetime()
+    if server_datetime is None:
+        return
+    botocore.auth.get_current_datetime = lambda: server_datetime
+
+
+def _r2_server_datetime():
+    global _R2_SERVER_DATETIME
+    if _R2_SERVER_DATETIME is not None:
+        return _R2_SERVER_DATETIME
+
+    urls = [
+        _setting("R2_ENDPOINT_URL"),
+        "https://api.cloudflare.com/client/v4",
+        "https://www.cloudflare.com",
+    ]
+    date_header = None
+    for url in urls:
+        if not url:
+            continue
+        date_header = _date_header_from_url(str(url))
+        if date_header:
+            break
+
+    if not date_header:
+        return None
+
+    parsed = parsedate_to_datetime(date_header)
+    _R2_SERVER_DATETIME = parsed.replace(tzinfo=None)
+    return _R2_SERVER_DATETIME
+
+
+def _date_header_from_url(url: str) -> str | None:
+    request = urllib.request.Request(url, method="HEAD")
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return response.headers.get("Date")
+    except urllib.error.HTTPError as exc:
+        return exc.headers.get("Date")
+    except Exception:
+        return None
 
 
 def _setting(name: str) -> Any:
