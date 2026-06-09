@@ -28,3 +28,13 @@ indices:
     name: Dow Jones Industrial Average
     symbol: ^DJI
     data_provider: yfinance
+  - id: wti_oil
+    market: Macro
+    name: WTI Crude Oil
+    symbol: CL=F
+    data_provider: yfinance
+  - id: us10y
+    market: Macro
+    name: US 10Y Treasury Yield
+    symbol: ^TNX
+    data_provider: yfinance

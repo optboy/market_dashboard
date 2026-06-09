@@ -23,6 +23,29 @@ BIAS_COLORS = {
     "sell_bias": "#dc2626",
     "neutral": "#64748b",
 }
+MARKET_ORDER = ["KOSPI", "KOSDAQ", "S&P 500", "Nasdaq", "Dow"]
+COUNTRY_MARKETS = {
+    "한국": ["KOSPI", "KOSDAQ"],
+    "미국": ["S&P 500", "Nasdaq", "Dow"],
+}
+OVERVIEW_ASSETS = [
+    "kospi",
+    "kosdaq",
+    "sp500",
+    "nasdaq",
+    "dow",
+    "wti_oil",
+    "us10y",
+]
+SIGNAL_HELP = {
+    "P": "종가와 20일 이동평균선 위치",
+    "MA": "20일/60일 이동평균선 배열",
+    "LT": "60일/120일 이동평균선 배열",
+    "RSI": "RSI14 모멘텀",
+    "MACD": "MACD와 시그널선/0선",
+    "BB": "볼린저밴드 중단 대비 위치",
+    "VOL": "거래량 확인 강도",
+}
 INDICATOR_DIR = Path("data/processed/indicators")
 CACHE_TTL_SECONDS = 10 * 60
 
@@ -31,6 +54,69 @@ st.set_page_config(
     page_title="Market Technical Score Dashboard",
     page_icon="📈",
     layout="wide",
+)
+
+st.markdown(
+    """
+    <style>
+    .stApp { font-size: 14px; }
+    div[data-testid="stMetric"] { padding: 0.25rem 0; }
+    div[data-testid="stMetric"] label { font-size: 0.78rem; }
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] { font-size: 1.15rem; }
+    div[data-testid="stMetric"] [data-testid="stMetricDelta"] { font-size: 0.78rem; }
+    .compact-row {
+        border-bottom: 1px solid #e5e7eb;
+        padding: 0.2rem 0 0.05rem 0;
+    }
+    .asset-title {
+        font-weight: 650;
+        line-height: 1.15;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .asset-subtitle {
+        color: #64748b;
+        font-size: 0.76rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .score-line {
+        font-size: 0.78rem;
+        color: #334155;
+        white-space: nowrap;
+    }
+    .signal-grid {
+        display: flex;
+        gap: 4px;
+        flex-wrap: nowrap;
+        align-items: center;
+    }
+    .signal-cell {
+        min-width: 34px;
+        padding: 3px 4px;
+        border-radius: 5px;
+        color: white;
+        font-size: 0.70rem;
+        font-weight: 700;
+        text-align: center;
+        line-height: 1.05;
+    }
+    .signal-cell-neutral {
+        color: #334155;
+        background: #e2e8f0;
+    }
+    @media (max-width: 768px) {
+        .stApp { font-size: 13px; }
+        .asset-title { font-size: 0.85rem; }
+        .asset-subtitle, .score-line { font-size: 0.70rem; }
+        .signal-cell { min-width: 29px; padding: 3px 2px; font-size: 0.64rem; }
+        div[data-testid="stMetric"] [data-testid="stMetricValue"] { font-size: 0.95rem; }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 
@@ -110,31 +196,74 @@ def prepare_scores(scores: pd.DataFrame) -> pd.DataFrame:
     result["negative_reasons_list"] = result["negative_reasons"].apply(parse_reasons)
     result["top_positive"] = result["positive_reasons_list"].apply(join_top_reasons)
     result["top_negative"] = result["negative_reasons_list"].apply(join_top_reasons)
+    result["display_name"] = result.apply(format_display_name, axis=1)
     return result
 
 
 def render_market_overview(scores: pd.DataFrame, updated_at: str) -> None:
-    st.subheader("시장 요약")
+    st.subheader("시장 한눈에 보기")
     st.caption(f"마지막 처리 시각: {updated_at}")
 
-    markets = sorted(scores["market"].unique())
-    cols = st.columns(len(markets))
-    for col, market in zip(cols, markets):
-        market_scores = scores[scores["market"] == market]
-        avg_net = market_scores["net_score"].mean()
-        bullish_count = int((market_scores["bias"] == "buy_bias").sum())
-        bearish_count = int((market_scores["bias"] == "sell_bias").sum())
-        label = market_condition_label(avg_net)
-        col.metric(
-            market,
-            label,
-            delta=f"평균 net {avg_net:.1f}",
+    overview_rows = scores[scores["index_id"].isin(OVERVIEW_ASSETS)].copy()
+    overview_rows["overview_order"] = overview_rows["index_id"].apply(
+        lambda asset_id: OVERVIEW_ASSETS.index(asset_id) if asset_id in OVERVIEW_ASSETS else 99
+    )
+    overview_rows = overview_rows.sort_values("overview_order")
+
+    if not overview_rows.empty:
+        cols = st.columns(min(len(overview_rows), 7))
+        for col, (_, row) in zip(cols, overview_rows.iterrows()):
+            label = row["bias_label"]
+            col.metric(
+                compact_overview_name(row),
+                label,
+                delta=f"1D {row['change_pct']:.2f}% · Net {row['net_score']:.0f}",
+            )
+            col.markdown(render_signal_grid(row, compact=True), unsafe_allow_html=True)
+
+    market_summary = scores[scores["market"].isin(MARKET_ORDER)].copy()
+    if not market_summary.empty:
+        market_summary["market_order"] = market_summary["market"].apply(market_sort_key)
+        summary = (
+            market_summary.groupby("market", as_index=False)
+            .agg(
+                net_score=("net_score", "mean"),
+                bullish=("bias", lambda values: int((values == "buy_bias").sum())),
+                bearish=("bias", lambda values: int((values == "sell_bias").sum())),
+                count=("bias", "size"),
+                market_order=("market_order", "min"),
+            )
+            .sort_values("market_order")
         )
-        col.caption(f"상승 우위 {bullish_count} / 하락 우위 {bearish_count}")
+        st.dataframe(
+            summary.assign(
+                상태=summary["net_score"].apply(market_condition_label),
+                상승비중=(summary["bullish"] / summary["count"] * 100).round(0).astype(int).astype(str) + "%",
+            )[["market", "상태", "net_score", "상승비중", "bullish", "bearish", "count"]].rename(
+                columns={
+                    "market": "시장",
+                    "net_score": "평균 Net",
+                    "bullish": "상승 우위",
+                    "bearish": "하락 우위",
+                    "count": "종목 수",
+                }
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
 
 
 def render_market_selector(scores: pd.DataFrame) -> str:
-    markets = sorted(scores["market"].unique())
+    available = [market for market in MARKET_ORDER if market in set(scores["market"])]
+    if not available:
+        available = sorted(scores["market"].unique())
+    selected_country = st.segmented_control(
+        "국가",
+        list(COUNTRY_MARKETS.keys()),
+        default="한국" if any(market in available for market in COUNTRY_MARKETS["한국"]) else "미국",
+    )
+    country_markets = [market for market in COUNTRY_MARKETS.get(selected_country or "한국", []) if market in available]
+    markets = country_markets or available
     selected = st.segmented_control(
         "시장 선택",
         markets,
@@ -151,22 +280,24 @@ def render_rankings(scores: pd.DataFrame) -> str:
         st.caption("상단 10개는 정렬 기준에 따라 자동 갱신됩니다.")
 
     sort_options = {
-        "상승 시그널 점수": "bullish_score",
-        "하락 시그널 점수": "bearish_score",
+        "상승 점수": "bullish_score",
+        "하락 점수": "bearish_score",
         "Net Score": "net_score",
-        "등락률": "change_pct",
+        "1D 등락률": "change_pct",
         "RSI": "rsi14",
     }
-    col1, col2, col3 = st.columns([0.3, 0.25, 0.45])
+    col1, col2, col3 = st.columns([0.28, 0.18, 0.54])
     sort_label = col1.selectbox("정렬 기준", list(sort_options.keys()))
     ascending = col2.toggle("오름차순", value=False)
-    query = col3.text_input("검색", placeholder="지수/종목명 또는 ID")
+    query = col3.text_input("검색", placeholder="종목명, 티커, ID")
 
     filtered = scores.copy()
     if query:
         lowered = query.lower()
         filtered = filtered[
             filtered["name"].str.lower().str.contains(lowered)
+            | filtered["symbol"].astype(str).str.lower().str.contains(lowered)
+            | filtered["display_name"].str.lower().str.contains(lowered)
             | filtered["index_id"].str.lower().str.contains(lowered)
         ]
 
@@ -174,6 +305,7 @@ def render_rankings(scores: pd.DataFrame) -> str:
     top_scores = filtered.head(10)
 
     st.write("Top 10")
+    st.caption("1D는 최근 거래일 종가의 전일 대비 등락률입니다. 색상 타일은 기술지표별 긍정/부정 강도입니다.")
     selected_id = None
     for _, row in top_scores.iterrows():
         clicked = render_ranking_card(row)
@@ -184,10 +316,11 @@ def render_rankings(scores: pd.DataFrame) -> str:
     table = filtered[
         [
             "index_id",
-            "name",
+            "display_name",
             "last_date",
             "last_price",
             "change_pct",
+            "rsi14",
             "bullish_score",
             "bearish_score",
             "net_score",
@@ -196,10 +329,11 @@ def render_rankings(scores: pd.DataFrame) -> str:
     ].rename(
         columns={
             "index_id": "ID",
-            "name": "이름",
+            "display_name": "종목",
             "last_date": "최근 거래일",
             "last_price": "종가",
-            "change_pct": "등락률(%)",
+            "change_pct": "1D(%)",
+            "rsi14": "RSI",
             "bullish_score": "상승 점수",
             "bearish_score": "하락 점수",
             "net_score": "Net",
@@ -218,7 +352,7 @@ def render_rankings(scores: pd.DataFrame) -> str:
         "상세 보기 선택",
         options,
         index=options.index(default_id),
-        format_func=lambda asset_id: filtered[filtered["index_id"] == asset_id].iloc[0]["name"],
+        format_func=lambda asset_id: filtered[filtered["index_id"] == asset_id].iloc[0]["display_name"],
     )
 
 
@@ -226,12 +360,25 @@ def render_ranking_card(row: pd.Series) -> bool:
     indicator = load_indicator_data(row["index_id"])
     color = BIAS_COLORS.get(row["bias"], "#64748b")
 
-    with st.container(border=True):
-        cols = st.columns([0.18, 0.16, 0.16, 0.18, 0.32])
-        clicked = cols[0].button(row["name"], key=f"rank-{row['index_id']}")
-        cols[1].metric("상승", int(row["bullish_score"]))
-        cols[2].metric("하락", int(row["bearish_score"]))
-        cols[3].metric("등락률", f"{row['change_pct']:.2f}%")
+    with st.container():
+        st.markdown('<div class="compact-row">', unsafe_allow_html=True)
+        cols = st.columns([0.14, 0.22, 0.21, 0.27, 0.16])
+        clicked = cols[0].button(compact_button_label(row), key=f"rank-{row['index_id']}", use_container_width=True)
+        cols[1].markdown(
+            f"""
+            <div class="asset-title">{row['display_name']}</div>
+            <div class="asset-subtitle">{row['last_date']} · {row['bias_label']}</div>
+            """,
+            unsafe_allow_html=True,
+        )
+        cols[2].markdown(
+            f"""
+            <div class="score-line">Net <b>{row['net_score']:.0f}</b> · 상승 {row['bullish_score']:.0f} / 하락 {row['bearish_score']:.0f}</div>
+            <div class="score-line">1D <b>{row['change_pct']:.2f}%</b> · RSI {row['rsi14']:.1f}</div>
+            """,
+            unsafe_allow_html=True,
+        )
+        cols[3].markdown(render_signal_grid(row), unsafe_allow_html=True)
         if indicator.empty:
             cols[4].caption("차트 데이터 없음")
         else:
@@ -240,20 +387,23 @@ def render_ranking_card(row: pd.Series) -> bool:
                 use_container_width=True,
                 config={"displayModeBar": False},
             )
+        st.markdown("</div>", unsafe_allow_html=True)
     return clicked
 
 
 def render_detail(row: pd.Series) -> None:
-    st.subheader(f"{row['name']} 상세")
+    st.subheader(f"{row['display_name']} 상세")
     indicator = load_indicator_data(row["index_id"])
 
     metric_cols = st.columns(6)
     metric_cols[0].metric("종가", f"{row['last_price']:,.2f}")
-    metric_cols[1].metric("등락률", f"{row['change_pct']:.2f}%")
+    metric_cols[1].metric("1D", f"{row['change_pct']:.2f}%")
     metric_cols[2].metric("상승 점수", int(row["bullish_score"]))
     metric_cols[3].metric("하락 점수", int(row["bearish_score"]))
     metric_cols[4].metric("Net", int(row["net_score"]))
     metric_cols[5].metric("판단", row["bias_label"])
+
+    st.markdown(render_signal_grid(row, show_help=True), unsafe_allow_html=True)
 
     if indicator.empty:
         st.warning("상세 차트 데이터가 없습니다.")
@@ -264,33 +414,34 @@ def render_detail(row: pd.Series) -> None:
             config={"displayModeBar": True},
         )
 
-    left, right = st.columns(2)
-    with left:
-        st.write("긍정 시그널")
-        for reason in row["positive_reasons_list"]:
-            st.success(reason, icon="↗")
-    with right:
-        st.write("부정/주의 시그널")
-        for reason in row["negative_reasons_list"]:
-            st.error(reason, icon="↘")
-
     render_indicator_snapshot(row)
+
+    with st.expander("문장형 시그널 보기"):
+        left, right = st.columns(2)
+        with left:
+            st.write("긍정 시그널")
+            for reason in row["positive_reasons_list"]:
+                st.success(reason, icon="↗")
+        with right:
+            st.write("부정/주의 시그널")
+            for reason in row["negative_reasons_list"]:
+                st.error(reason, icon="↘")
 
 
 def render_indicator_snapshot(row: pd.Series) -> None:
     st.write("기술적 지표 스냅샷")
     snapshot = pd.DataFrame(
         [
-            {"지표": "MA20", "값": row["ma20"]},
-            {"지표": "MA60", "값": row["ma60"]},
-            {"지표": "MA120", "값": row["ma120"]},
-            {"지표": "RSI14", "값": row["rsi14"]},
-            {"지표": "MACD", "값": row["macd"]},
-            {"지표": "MACD Signal", "값": row["macd_signal"]},
-            {"지표": "Bollinger Upper", "값": row["bb_upper"]},
-            {"지표": "Bollinger Middle", "값": row["bb_middle"]},
-            {"지표": "Bollinger Lower", "값": row["bb_lower"]},
-            {"지표": "Volume MA20", "값": row["volume_ma20"]},
+            {"지표": "MA20", "값": row["ma20"], "해석": signal_status_text(row, "P")},
+            {"지표": "MA60", "값": row["ma60"], "해석": signal_status_text(row, "MA")},
+            {"지표": "MA120", "값": row["ma120"], "해석": signal_status_text(row, "LT")},
+            {"지표": "RSI14", "값": row["rsi14"], "해석": signal_status_text(row, "RSI")},
+            {"지표": "MACD", "값": row["macd"], "해석": signal_status_text(row, "MACD")},
+            {"지표": "MACD Signal", "값": row["macd_signal"], "해석": ""},
+            {"지표": "BB Upper", "값": row["bb_upper"], "해석": ""},
+            {"지표": "BB Middle", "값": row["bb_middle"], "해석": signal_status_text(row, "BB")},
+            {"지표": "BB Lower", "값": row["bb_lower"], "해석": ""},
+            {"지표": "Volume MA20", "값": row["volume_ma20"], "해석": signal_status_text(row, "VOL")},
         ]
     )
     st.dataframe(snapshot, use_container_width=True, hide_index=True)
@@ -338,7 +489,7 @@ def build_mini_chart(df: pd.DataFrame, color: str) -> go.Figure:
         )
     )
     fig.update_layout(
-        height=90,
+        height=52,
         margin={"l": 0, "r": 0, "t": 4, "b": 0},
         xaxis={"visible": False},
         yaxis={"visible": False},
@@ -394,7 +545,7 @@ def build_detail_chart(df: pd.DataFrame, row: pd.Series) -> go.Figure:
         font={"color": signal_color},
     )
     fig.update_layout(
-        height=520,
+        height=460,
         margin={"l": 10, "r": 10, "t": 20, "b": 10},
         xaxis_rangeslider_visible=False,
         legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1},
@@ -414,6 +565,141 @@ def parse_reasons(value: str) -> list[str]:
 
 def join_top_reasons(reasons: list[str], limit: int = 2) -> str:
     return " / ".join(reasons[:limit])
+
+
+def format_display_name(row: pd.Series) -> str:
+    symbol = str(row.get("symbol") or "")
+    name = str(row.get("name") or symbol)
+    if symbol and name and name != symbol and row.get("asset_type") == "stock":
+        return f"{symbol} · {name}"
+    return name
+
+
+def compact_button_label(row: pd.Series) -> str:
+    symbol = str(row.get("symbol") or row["index_id"])
+    if row.get("asset_type") == "stock":
+        return symbol[:10]
+    return str(row["name"])[:10]
+
+
+def compact_overview_name(row: pd.Series) -> str:
+    names = {
+        "kospi": "KOSPI",
+        "kosdaq": "KOSDAQ",
+        "sp500": "S&P 500",
+        "nasdaq": "Nasdaq",
+        "dow": "Dow",
+        "wti_oil": "WTI",
+        "us10y": "US10Y",
+    }
+    return names.get(row["index_id"], row["name"])
+
+
+def market_sort_key(market: str) -> int:
+    try:
+        return MARKET_ORDER.index(market)
+    except ValueError:
+        return len(MARKET_ORDER)
+
+
+def render_signal_grid(row: pd.Series, compact: bool = False, show_help: bool = False) -> str:
+    cells = []
+    for signal in SIGNAL_HELP:
+        direction, strength = signal_strength(row, signal)
+        title = SIGNAL_HELP[signal]
+        if show_help:
+            title = f"{signal}: {title} - {signal_status_text(row, signal)}"
+        css_class = "signal-cell"
+        style = f"background:{signal_color(direction, strength)};"
+        if direction == "neutral":
+            css_class += " signal-cell-neutral"
+            style = ""
+        label = signal if compact else f"{signal}<br>{strength}"
+        cells.append(f'<span class="{css_class}" style="{style}" title="{title}">{label}</span>')
+    return f'<div class="signal-grid">{"".join(cells)}</div>'
+
+
+def signal_strength(row: pd.Series, signal: str) -> tuple[str, int]:
+    close = safe_float(row.get("last_price"))
+    change_pct = safe_float(row.get("change_pct"))
+    ma20 = safe_float(row.get("ma20"))
+    ma60 = safe_float(row.get("ma60"))
+    ma120 = safe_float(row.get("ma120"))
+    rsi = safe_float(row.get("rsi14"))
+    macd = safe_float(row.get("macd"))
+    macd_signal = safe_float(row.get("macd_signal"))
+    bb_middle = safe_float(row.get("bb_middle"))
+    volume = safe_float(row.get("volume"))
+    volume_ma20 = safe_float(row.get("volume_ma20"))
+
+    if signal == "P":
+        return ratio_signal(close, ma20, threshold_pct=5)
+    if signal == "MA":
+        return ratio_signal(ma20, ma60, threshold_pct=4)
+    if signal == "LT":
+        return ratio_signal(ma60, ma120, threshold_pct=5)
+    if signal == "RSI":
+        if pd.isna(rsi):
+            return "neutral", 0
+        if 45 <= rsi <= 55:
+            return "neutral", int(abs(rsi - 50) / 5 * 2)
+        direction = "bullish" if rsi > 55 else "bearish"
+        return direction, clamp_strength(abs(rsi - 50) / 20 * 4)
+    if signal == "MACD":
+        if pd.isna(macd) or pd.isna(macd_signal):
+            return "neutral", 0
+        direction = "bullish" if macd >= macd_signal else "bearish"
+        base = abs(macd - macd_signal) / max(abs(close), 1) * 100
+        bonus = 1 if (macd > 0 and direction == "bullish") or (macd < 0 and direction == "bearish") else 0
+        return direction, clamp_strength(base * 10 + bonus)
+    if signal == "BB":
+        return ratio_signal(close, bb_middle, threshold_pct=4)
+    if signal == "VOL":
+        if pd.isna(volume) or pd.isna(volume_ma20) or volume_ma20 == 0:
+            return "neutral", 0
+        ratio = volume / volume_ma20
+        if ratio < 0.9:
+            return "neutral", 1
+        direction = "bullish" if change_pct >= 0 else "bearish"
+        return direction, clamp_strength((ratio - 0.9) / 0.6 * 4)
+    return "neutral", 0
+
+
+def ratio_signal(left: float, right: float, threshold_pct: float) -> tuple[str, int]:
+    if pd.isna(left) or pd.isna(right) or right == 0:
+        return "neutral", 0
+    pct = (left - right) / abs(right) * 100
+    if abs(pct) < 0.2:
+        return "neutral", 0
+    return ("bullish" if pct > 0 else "bearish"), clamp_strength(abs(pct) / threshold_pct * 4)
+
+
+def signal_color(direction: str, strength: int) -> str:
+    alpha = 0.28 + min(max(strength, 0), 4) * 0.15
+    if direction == "bullish":
+        return f"rgba(22, 163, 74, {alpha:.2f})"
+    if direction == "bearish":
+        return f"rgba(220, 38, 38, {alpha:.2f})"
+    return "#e2e8f0"
+
+
+def signal_status_text(row: pd.Series, signal: str) -> str:
+    direction, strength = signal_strength(row, signal)
+    direction_text = {"bullish": "긍정", "bearish": "부정", "neutral": "중립"}[direction]
+    return f"{direction_text} {strength}/4"
+
+
+def safe_float(value: object) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float("nan")
+
+
+def clamp_strength(value: float) -> int:
+    if pd.isna(value):
+        return 0
+    return max(1, min(4, int(round(value))))
 
 
 def market_condition_label(avg_net: float) -> str:

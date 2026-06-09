@@ -12,4 +12,6 @@ def test_load_indices_includes_expected_providers() -> None:
         "sp500",
         "nasdaq",
         "dow",
+        "wti_oil",
+        "us10y",
     }

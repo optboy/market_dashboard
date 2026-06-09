@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 import pandas as pd
 
 
 OHLCV_COLUMNS = ["date", "open", "high", "low", "close", "volume"]
+YFINANCE_CACHE_DIR = Path(".cache/yfinance")
 
 
 def fetch_index_ohlcv(index: dict, start_date: date, end_date: date) -> pd.DataFrame:
@@ -108,6 +110,9 @@ def fetch_pykrx_stock_ohlcv(symbol: str, start_date: date, end_date: date) -> pd
 def fetch_yfinance_index_ohlcv(symbol: str, start_date: date, end_date: date) -> pd.DataFrame:
     """Fetch US index OHLCV data from yfinance."""
     import yfinance as yf
+
+    YFINANCE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    yf.set_tz_cache_location(str(YFINANCE_CACHE_DIR))
 
     raw = yf.download(
         symbol,

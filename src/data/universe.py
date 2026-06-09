@@ -11,6 +11,7 @@ from src.data.index_config import load_indices
 
 UNIVERSE_PATH = Path("data/processed/universe.csv")
 US_SEED_PATH = Path("config/us_seed_symbols.yaml")
+US_COMPANY_NAMES_PATH = Path("config/us_company_names.yaml")
 KOREA_SEED_PATH = Path("config/korea_seed_symbols.yaml")
 
 
@@ -93,6 +94,7 @@ def _latest_market_cap_date(market: str) -> date:
 def _us_seed_rows(limit: int) -> list[dict]:
     with US_SEED_PATH.open("r", encoding="utf-8") as file:
         data = yaml.safe_load(file)
+    company_names = _us_company_names()
 
     rows = []
     for market_id, config in data["markets"].items():
@@ -104,7 +106,7 @@ def _us_seed_rows(limit: int) -> list[dict]:
                     "asset_id": f"{market_id}_{symbol.replace('-', '_')}",
                     "asset_type": "stock",
                     "market": config["market"],
-                    "name": symbol,
+                    "name": company_names.get(symbol, symbol),
                     "symbol": symbol,
                     "data_provider": "yfinance",
                     "fallback_provider": None,
@@ -113,6 +115,14 @@ def _us_seed_rows(limit: int) -> list[dict]:
                 }
             )
     return rows
+
+
+def _us_company_names() -> dict[str, str]:
+    if not US_COMPANY_NAMES_PATH.exists():
+        return {}
+    with US_COMPANY_NAMES_PATH.open("r", encoding="utf-8") as file:
+        data = yaml.safe_load(file) or {}
+    return {str(symbol): str(name) for symbol, name in data.get("symbols", {}).items()}
 
 
 def _korean_seed_symbols(market_id: str, limit: int) -> list[str]:

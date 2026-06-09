@@ -1,0 +1,165 @@
+symbols:
+  AAPL: Apple
+  MSFT: Microsoft
+  NVDA: NVIDIA
+  AMZN: Amazon
+  GOOGL: Alphabet Class A
+  GOOG: Alphabet Class C
+  META: Meta Platforms
+  BRK-B: Berkshire Hathaway
+  AVGO: Broadcom
+  TSLA: Tesla
+  JPM: JPMorgan Chase
+  LLY: Eli Lilly
+  V: Visa
+  XOM: Exxon Mobil
+  MA: Mastercard
+  UNH: UnitedHealth Group
+  COST: Costco Wholesale
+  WMT: Walmart
+  PG: Procter & Gamble
+  NFLX: Netflix
+  JNJ: Johnson & Johnson
+  HD: Home Depot
+  ABBV: AbbVie
+  BAC: Bank of America
+  KO: Coca-Cola
+  PLTR: Palantir
+  ORCL: Oracle
+  CRM: Salesforce
+  CSCO: Cisco Systems
+  AMD: Advanced Micro Devices
+  CVX: Chevron
+  WFC: Wells Fargo
+  IBM: IBM
+  GE: GE Aerospace
+  PM: Philip Morris
+  ABT: Abbott Laboratories
+  MCD: McDonald's
+  LIN: Linde
+  MRK: Merck
+  DIS: Walt Disney
+  NOW: ServiceNow
+  T: AT&T
+  ACN: Accenture
+  ISRG: Intuitive Surgical
+  INTU: Intuit
+  GS: Goldman Sachs
+  VZ: Verizon
+  TXN: Texas Instruments
+  QCOM: Qualcomm
+  PEP: PepsiCo
+  BKNG: Booking Holdings
+  RTX: RTX
+  CAT: Caterpillar
+  SPGI: S&P Global
+  AXP: American Express
+  MS: Morgan Stanley
+  AMGN: Amgen
+  LOW: Lowe's
+  NEE: NextEra Energy
+  PGR: Progressive
+  HON: Honeywell
+  BLK: BlackRock
+  AMAT: Applied Materials
+  TJX: TJX Companies
+  DHR: Danaher
+  UNP: Union Pacific
+  BSX: Boston Scientific
+  SYK: Stryker
+  GILD: Gilead Sciences
+  SCHW: Charles Schwab
+  DE: Deere
+  ADP: Automatic Data Processing
+  CMCSA: Comcast
+  PANW: Palo Alto Networks
+  C: Citigroup
+  LRCX: Lam Research
+  ETN: Eaton
+  ADI: Analog Devices
+  COP: ConocoPhillips
+  CB: Chubb
+  KLAC: KLA
+  MU: Micron Technology
+  MDLZ: Mondelez
+  UPS: UPS
+  BMY: Bristol Myers Squibb
+  SO: Southern Company
+  ANET: Arista Networks
+  ELV: Elevance Health
+  SBUX: Starbucks
+  PLD: Prologis
+  ICE: Intercontinental Exchange
+  SHW: Sherwin-Williams
+  MO: Altria
+  WM: Waste Management
+  CVS: CVS Health
+  APH: Amphenol
+  CDNS: Cadence Design Systems
+  SNPS: Synopsys
+  TMUS: T-Mobile US
+  MELI: MercadoLibre
+  CTAS: Cintas
+  CRWD: CrowdStrike
+  MAR: Marriott International
+  ORLY: O'Reilly Automotive
+  CSX: CSX
+  FTNT: Fortinet
+  PYPL: PayPal
+  REGN: Regeneron
+  ABNB: Airbnb
+  NXPI: NXP Semiconductors
+  MNST: Monster Beverage
+  MSTR: MicroStrategy
+  WDAY: Workday
+  ROP: Roper Technologies
+  AEP: American Electric Power
+  ADSK: Autodesk
+  PCAR: PACCAR
+  KDP: Keurig Dr Pepper
+  EXC: Exelon
+  FAST: Fastenal
+  PAYX: Paychex
+  AXON: Axon Enterprise
+  CEG: Constellation Energy
+  TEAM: Atlassian
+  DDOG: Datadog
+  XEL: Xcel Energy
+  IDXX: IDEXX Laboratories
+  EA: Electronic Arts
+  BKR: Baker Hughes
+  ODFL: Old Dominion Freight Line
+  VRSK: Verisk Analytics
+  GEHC: GE HealthCare
+  CCEP: Coca-Cola Europacific Partners
+  LULU: Lululemon
+  FANG: Diamondback Energy
+  CTSH: Cognizant
+  DXCM: Dexcom
+  BIIB: Biogen
+  GFS: GlobalFoundries
+  "ON": ON Semiconductor
+  CDW: CDW
+  ZS: Zscaler
+  MDB: MongoDB
+  WBD: Warner Bros. Discovery
+  MCHP: Microchip Technology
+  TTWO: Take-Two Interactive
+  ILMN: Illumina
+  MRVL: Marvell Technology
+  DLTR: Dollar Tree
+  SIRI: Sirius XM
+  ENPH: Enphase Energy
+  ZM: Zoom Communications
+  LC: LendingClub
+  RIVN: Rivian
+  ARM: Arm Holdings
+  APP: AppLovin
+  TTD: The Trade Desk
+  SMCI: Super Micro Computer
+  ASML: ASML
+  AZN: AstraZeneca
+  BA: Boeing
+  MMM: 3M
+  NKE: Nike
+  TRV: Travelers

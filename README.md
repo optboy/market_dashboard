@@ -106,3 +106,11 @@ python -m scripts.upload_processed_to_r2
 ```
 
 Streamlit reads from R2 when those environment variables are configured. If they are not configured, it falls back to local files under `data/processed/`.
+
+Clean local generated files after R2 upload:
+
+```bash
+python -m scripts.cleanup_local_data
+```
+
+This removes `data/raw`, `data/processed/indicators`, and `.cache/yfinance` contents while keeping `index_scores.csv` and `universe.csv` for local fallback. Use `--include-scores` only when you want to remove those fallback files too.
