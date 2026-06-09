@@ -7,6 +7,8 @@ def add_moving_averages(df: pd.DataFrame) -> pd.DataFrame:
     result["ma20"] = result["close"].rolling(window=20).mean()
     result["ma60"] = result["close"].rolling(window=60).mean()
     result["ma120"] = result["close"].rolling(window=120).mean()
+    result["ema20"] = result["close"].ewm(span=20, adjust=False).mean()
+    result["ema60"] = result["close"].ewm(span=60, adjust=False).mean()
     return result
 
 
@@ -32,6 +34,16 @@ def add_macd(df: pd.DataFrame) -> pd.DataFrame:
     ema26 = result["close"].ewm(span=26, adjust=False).mean()
     result["macd"] = ema12 - ema26
     result["macd_signal"] = result["macd"].ewm(span=9, adjust=False).mean()
+    result["macd_hist"] = result["macd"] - result["macd_signal"]
+    return result
+
+
+def add_drawdown(df: pd.DataFrame) -> pd.DataFrame:
+    """Add current drawdown and 120-day maximum drawdown percentage."""
+    result = df.copy()
+    cumulative_high = result["close"].cummax()
+    result["drawdown_pct"] = ((result["close"] / cumulative_high) - 1) * 100
+    result["mdd_120d_pct"] = result["drawdown_pct"].rolling(window=120, min_periods=1).min()
     return result
 
 
@@ -69,6 +81,7 @@ def add_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
     result = add_moving_averages(df)
     result = add_rsi(result)
     result = add_macd(result)
+    result = add_drawdown(result)
     result = add_bollinger_bands(result)
     result = add_volume_average(result)
     result = add_price_structure(result)

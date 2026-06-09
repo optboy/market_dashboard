@@ -7,6 +7,8 @@ thresholds:
   rsi_weak: 40
   rsi_oversold: 30
   high_volume_ratio: 1.0
+  mild_drawdown_pct: -5
+  severe_drawdown_pct: -20
 
 weights:
   trend:
@@ -14,9 +16,11 @@ weights:
     ma20_above_ma60: 10
     ma60_above_ma120: 10
     ma20_slope_up: 5
+    ema20_above_ema60: 5
   momentum:
     macd_above_signal: 10
     macd_above_zero: 5
+    macd_hist_direction: 5
     rsi_healthy: 5
     rsi_direction: 5
   structure:
@@ -31,3 +35,5 @@ weights:
   volatility:
     close_above_bb_middle: 5
     overbought_oversold_risk: 5
+    mild_drawdown: 4
+    severe_drawdown: 8

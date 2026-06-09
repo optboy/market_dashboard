@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 import yaml
+from plotly.subplots import make_subplots
 
 from src.data.processed import load_index_scores
 from src.data.r2_storage import download_dataframe, is_r2_configured, missing_r2_settings
@@ -40,10 +41,12 @@ OVERVIEW_ASSETS = [
 SIGNAL_HELP = {
     "P": "종가와 20일 이동평균선 위치",
     "MA": "20일/60일 이동평균선 배열",
+    "EMA": "EMA20/EMA60 반응 추세",
     "LT": "60일/120일 이동평균선 배열",
     "RSI": "RSI14 모멘텀",
-    "MACD": "MACD와 시그널선/0선",
+    "MACD": "MACD 히스토그램과 시그널",
     "BB": "볼린저밴드 중단 대비 위치",
+    "DD": "고점 대비 낙폭",
     "VOL": "거래량 확인 강도",
 }
 INDICATOR_DIR = Path("data/processed/indicators")
@@ -189,6 +192,9 @@ def prepare_scores(scores: pd.DataFrame) -> pd.DataFrame:
         result["symbol"] = result["index_id"]
     if "market_cap" not in result.columns:
         result["market_cap"] = None
+    for column in ["ema20", "ema60", "macd_hist", "drawdown_pct", "mdd_120d_pct"]:
+        if column not in result.columns:
+            result[column] = None
 
     result["bias_label"] = result["bias"].map(BIAS_LABELS).fillna(result["bias"])
     result["net_score"] = result["bullish_score"] - result["bearish_score"]
@@ -321,6 +327,7 @@ def render_rankings(scores: pd.DataFrame) -> str:
             "last_price",
             "change_pct",
             "rsi14",
+            "drawdown_pct",
             "bullish_score",
             "bearish_score",
             "net_score",
@@ -334,6 +341,7 @@ def render_rankings(scores: pd.DataFrame) -> str:
             "last_price": "종가",
             "change_pct": "1D(%)",
             "rsi14": "RSI",
+            "drawdown_pct": "DD(%)",
             "bullish_score": "상승 점수",
             "bearish_score": "하락 점수",
             "net_score": "Net",
@@ -374,7 +382,7 @@ def render_ranking_card(row: pd.Series) -> bool:
         cols[2].markdown(
             f"""
             <div class="score-line">Net <b>{row['net_score']:.0f}</b> · 상승 {row['bullish_score']:.0f} / 하락 {row['bearish_score']:.0f}</div>
-            <div class="score-line">1D <b>{row['change_pct']:.2f}%</b> · RSI {row['rsi14']:.1f}</div>
+            <div class="score-line">1D <b>{row['change_pct']:.2f}%</b> · RSI {row['rsi14']:.1f} · DD {safe_float(row.get('drawdown_pct')):.1f}%</div>
             """,
             unsafe_allow_html=True,
         )
@@ -435,12 +443,17 @@ def render_indicator_snapshot(row: pd.Series) -> None:
             {"지표": "MA20", "값": row["ma20"], "해석": signal_status_text(row, "P")},
             {"지표": "MA60", "값": row["ma60"], "해석": signal_status_text(row, "MA")},
             {"지표": "MA120", "값": row["ma120"], "해석": signal_status_text(row, "LT")},
+            {"지표": "EMA20", "값": row["ema20"], "해석": signal_status_text(row, "EMA")},
+            {"지표": "EMA60", "값": row["ema60"], "해석": ""},
             {"지표": "RSI14", "값": row["rsi14"], "해석": signal_status_text(row, "RSI")},
             {"지표": "MACD", "값": row["macd"], "해석": signal_status_text(row, "MACD")},
             {"지표": "MACD Signal", "값": row["macd_signal"], "해석": ""},
+            {"지표": "MACD Hist", "값": row["macd_hist"], "해석": ""},
             {"지표": "BB Upper", "값": row["bb_upper"], "해석": ""},
             {"지표": "BB Middle", "값": row["bb_middle"], "해석": signal_status_text(row, "BB")},
             {"지표": "BB Lower", "값": row["bb_lower"], "해석": ""},
+            {"지표": "Drawdown %", "값": row["drawdown_pct"], "해석": signal_status_text(row, "DD")},
+            {"지표": "MDD 120D %", "값": row["mdd_120d_pct"], "해석": ""},
             {"지표": "Volume MA20", "값": row["volume_ma20"], "해석": signal_status_text(row, "VOL")},
         ]
     )
@@ -502,7 +515,13 @@ def build_detail_chart(df: pd.DataFrame, row: pd.Series) -> go.Figure:
     recent = df.tail(180)
     signal_color = BIAS_COLORS.get(row["bias"], "#64748b")
 
-    fig = go.Figure()
+    fig = make_subplots(
+        rows=2,
+        cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.04,
+        row_heights=[0.74, 0.26],
+    )
     fig.add_trace(
         go.Candlestick(
             x=recent["date"],
@@ -513,18 +532,34 @@ def build_detail_chart(df: pd.DataFrame, row: pd.Series) -> go.Figure:
             name="Price",
             increasing_line_color="#16a34a",
             decreasing_line_color="#dc2626",
-        )
+        ),
+        row=1,
+        col=1,
     )
-    fig.add_trace(go.Scatter(x=recent["date"], y=recent["ma20"], name="MA20", line={"color": "#2563eb"}))
-    fig.add_trace(go.Scatter(x=recent["date"], y=recent["ma60"], name="MA60", line={"color": "#9333ea"}))
-    fig.add_trace(go.Scatter(x=recent["date"], y=recent["ma120"], name="MA120", line={"color": "#475569"}))
+    fig.add_trace(go.Scatter(x=recent["date"], y=recent["ma20"], name="MA20", line={"color": "#2563eb"}), row=1, col=1)
+    fig.add_trace(go.Scatter(x=recent["date"], y=recent["ma60"], name="MA60", line={"color": "#9333ea"}), row=1, col=1)
+    fig.add_trace(go.Scatter(x=recent["date"], y=recent["ma120"], name="MA120", line={"color": "#475569"}), row=1, col=1)
+    if "ema20" in recent.columns:
+        fig.add_trace(
+            go.Scatter(x=recent["date"], y=recent["ema20"], name="EMA20", line={"color": "#0f766e", "dash": "dash"}),
+            row=1,
+            col=1,
+        )
+    if "ema60" in recent.columns:
+        fig.add_trace(
+            go.Scatter(x=recent["date"], y=recent["ema60"], name="EMA60", line={"color": "#f97316", "dash": "dash"}),
+            row=1,
+            col=1,
+        )
     fig.add_trace(
         go.Scatter(
             x=recent["date"],
             y=recent["bb_upper"],
             name="BB Upper",
             line={"color": "#94a3b8", "dash": "dot"},
-        )
+        ),
+        row=1,
+        col=1,
     )
     fig.add_trace(
         go.Scatter(
@@ -534,7 +569,32 @@ def build_detail_chart(df: pd.DataFrame, row: pd.Series) -> go.Figure:
             line={"color": "#94a3b8", "dash": "dot"},
             fill="tonexty",
             fillcolor="rgba(148, 163, 184, 0.12)",
+        ),
+        row=1,
+        col=1,
+    )
+    if "macd_hist" in recent.columns:
+        hist_colors = ["#16a34a" if value >= 0 else "#dc2626" for value in recent["macd_hist"].fillna(0)]
+        fig.add_trace(
+            go.Bar(
+                x=recent["date"],
+                y=recent["macd_hist"],
+                name="MACD Hist",
+                marker_color=hist_colors,
+                opacity=0.55,
+            ),
+            row=2,
+            col=1,
         )
+    fig.add_trace(
+        go.Scatter(x=recent["date"], y=recent["macd"], name="MACD", line={"color": "#2563eb", "width": 1.5}),
+        row=2,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(x=recent["date"], y=recent["macd_signal"], name="Signal", line={"color": "#f97316", "width": 1.5}),
+        row=2,
+        col=1,
     )
     fig.add_annotation(
         x=recent["date"].iloc[-1],
@@ -543,13 +603,17 @@ def build_detail_chart(df: pd.DataFrame, row: pd.Series) -> go.Figure:
         showarrow=True,
         arrowcolor=signal_color,
         font={"color": signal_color},
+        row=1,
+        col=1,
     )
     fig.update_layout(
-        height=460,
+        height=520,
         margin={"l": 10, "r": 10, "t": 20, "b": 10},
         xaxis_rangeslider_visible=False,
         legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1},
     )
+    fig.update_yaxes(title_text="Price", row=1, col=1)
+    fig.update_yaxes(title_text="MACD", row=2, col=1)
     return fig
 
 
@@ -625,10 +689,14 @@ def signal_strength(row: pd.Series, signal: str) -> tuple[str, int]:
     ma20 = safe_float(row.get("ma20"))
     ma60 = safe_float(row.get("ma60"))
     ma120 = safe_float(row.get("ma120"))
+    ema20 = safe_float(row.get("ema20"))
+    ema60 = safe_float(row.get("ema60"))
     rsi = safe_float(row.get("rsi14"))
     macd = safe_float(row.get("macd"))
     macd_signal = safe_float(row.get("macd_signal"))
+    macd_hist = safe_float(row.get("macd_hist"))
     bb_middle = safe_float(row.get("bb_middle"))
+    drawdown_pct = safe_float(row.get("drawdown_pct"))
     volume = safe_float(row.get("volume"))
     volume_ma20 = safe_float(row.get("volume_ma20"))
 
@@ -636,6 +704,8 @@ def signal_strength(row: pd.Series, signal: str) -> tuple[str, int]:
         return ratio_signal(close, ma20, threshold_pct=5)
     if signal == "MA":
         return ratio_signal(ma20, ma60, threshold_pct=4)
+    if signal == "EMA":
+        return ratio_signal(ema20, ema60, threshold_pct=4)
     if signal == "LT":
         return ratio_signal(ma60, ma120, threshold_pct=5)
     if signal == "RSI":
@@ -646,6 +716,9 @@ def signal_strength(row: pd.Series, signal: str) -> tuple[str, int]:
         direction = "bullish" if rsi > 55 else "bearish"
         return direction, clamp_strength(abs(rsi - 50) / 20 * 4)
     if signal == "MACD":
+        if pd.notna(macd_hist):
+            direction = "bullish" if macd_hist >= 0 else "bearish"
+            return direction, clamp_strength(abs(macd_hist) / max(abs(close), 1) * 100 * 20 + 1)
         if pd.isna(macd) or pd.isna(macd_signal):
             return "neutral", 0
         direction = "bullish" if macd >= macd_signal else "bearish"
@@ -654,6 +727,14 @@ def signal_strength(row: pd.Series, signal: str) -> tuple[str, int]:
         return direction, clamp_strength(base * 10 + bonus)
     if signal == "BB":
         return ratio_signal(close, bb_middle, threshold_pct=4)
+    if signal == "DD":
+        if pd.isna(drawdown_pct):
+            return "neutral", 0
+        if drawdown_pct >= -3:
+            return "bullish", 1
+        if drawdown_pct >= -10:
+            return "neutral", clamp_strength(abs(drawdown_pct) / 10 * 2)
+        return "bearish", clamp_strength(abs(drawdown_pct) / 25 * 4)
     if signal == "VOL":
         if pd.isna(volume) or pd.isna(volume_ma20) or volume_ma20 == 0:
             return "neutral", 0

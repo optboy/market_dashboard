@@ -47,10 +47,14 @@ def score_latest_row(row: pd.Series, previous_row: pd.Series | None = None) -> S
     ma20 = row.get("ma20")
     ma60 = row.get("ma60")
     ma120 = row.get("ma120")
+    ema20 = row.get("ema20")
+    ema60 = row.get("ema60")
     rsi14 = row.get("rsi14")
     macd = row.get("macd")
     macd_signal = row.get("macd_signal")
+    macd_hist = row.get("macd_hist")
     bb_middle = row.get("bb_middle")
+    drawdown_pct = row.get("drawdown_pct")
     volume = row.get("volume")
     volume_ma20 = row.get("volume_ma20")
     high = row.get("high")
@@ -61,6 +65,7 @@ def score_latest_row(row: pd.Series, previous_row: pd.Series | None = None) -> S
 
     previous_close = None if previous_row is None else previous_row.get("close")
     previous_rsi = None if previous_row is None else previous_row.get("rsi14")
+    previous_macd_hist = None if previous_row is None else previous_row.get("macd_hist")
     previous_low_20d = None if previous_row is None else previous_row.get("prev_low_20d")
     previous_high_20d = None if previous_row is None else previous_row.get("prev_high_20d")
 
@@ -95,6 +100,14 @@ def score_latest_row(row: pd.Series, previous_row: pd.Series | None = None) -> S
         elif ma20_slope_5d < 0:
             sell_score += weights["trend"]["ma20_slope_up"]
             negative_reasons.append("20일 이동평균선 기울기가 최근 5거래일 기준 하락 중입니다.")
+
+    if pd.notna(ema20) and pd.notna(ema60):
+        if ema20 > ema60:
+            buy_score += weights["trend"]["ema20_above_ema60"]
+            positive_reasons.append("EMA20이 EMA60 위에 있어 단기 반응 추세가 우호적입니다.")
+        else:
+            sell_score += weights["trend"]["ema20_above_ema60"]
+            negative_reasons.append("EMA20이 EMA60 아래에 있어 단기 반응 추세가 약합니다.")
 
     if pd.notna(rsi14):
         if thresholds["rsi_healthy_min"] <= rsi14 <= thresholds["rsi_healthy_max"]:
@@ -134,6 +147,14 @@ def score_latest_row(row: pd.Series, previous_row: pd.Series | None = None) -> S
             sell_score += weights["momentum"]["macd_above_zero"]
             negative_reasons.append("MACD가 0선 아래에 있어 하락 모멘텀이 우세합니다.")
 
+    if pd.notna(macd_hist) and pd.notna(previous_macd_hist):
+        if macd_hist > previous_macd_hist:
+            buy_score += weights["momentum"]["macd_hist_direction"]
+            positive_reasons.append("MACD 히스토그램이 전 거래일보다 개선되었습니다.")
+        elif macd_hist < previous_macd_hist:
+            sell_score += weights["momentum"]["macd_hist_direction"]
+            negative_reasons.append("MACD 히스토그램이 전 거래일보다 악화되었습니다.")
+
     if pd.notna(close) and pd.notna(bb_middle):
         if close > bb_middle:
             buy_score += weights["volatility"]["close_above_bb_middle"]
@@ -141,6 +162,14 @@ def score_latest_row(row: pd.Series, previous_row: pd.Series | None = None) -> S
         else:
             sell_score += weights["volatility"]["close_above_bb_middle"]
             negative_reasons.append("종가가 볼린저밴드 중단 아래에 있습니다.")
+
+    if pd.notna(drawdown_pct):
+        if drawdown_pct >= thresholds["mild_drawdown_pct"]:
+            buy_score += weights["volatility"]["mild_drawdown"]
+            positive_reasons.append("고점 대비 낙폭이 제한적이라 추세 훼손이 크지 않습니다.")
+        elif drawdown_pct <= thresholds["severe_drawdown_pct"]:
+            sell_score += weights["volatility"]["severe_drawdown"]
+            negative_reasons.append("고점 대비 낙폭이 커서 추세 회복 부담이 있습니다.")
 
     if pd.notna(close) and pd.notna(high) and pd.notna(prev_high_20d) and high >= prev_high_20d:
         buy_score += weights["structure"]["breakout_20d_high"]
