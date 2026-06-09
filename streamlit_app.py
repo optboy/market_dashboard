@@ -24,6 +24,7 @@ BIAS_COLORS = {
     "neutral": "#64748b",
 }
 INDICATOR_DIR = Path("data/processed/indicators")
+CACHE_TTL_SECONDS = 10 * 60
 
 
 st.set_page_config(
@@ -36,6 +37,7 @@ st.set_page_config(
 def main() -> None:
     st.title("Market Technical Score Dashboard")
     st.caption("기술적 지표 기반 시장/종목 상태 요약")
+    render_cache_controls()
 
     scores = load_scores()
     if scores.empty:
@@ -63,12 +65,20 @@ def main() -> None:
     render_scoring_popover()
 
 
-@st.cache_data
+def render_cache_controls() -> None:
+    col1, col2 = st.columns([0.82, 0.18])
+    col1.caption("R2 데이터는 캐시를 사용하며, 기본적으로 10분마다 자동 갱신됩니다.")
+    if col2.button("데이터 새로고침", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner="R2/로컬 분석 데이터를 불러오는 중...")
 def load_scores() -> pd.DataFrame:
     return load_index_scores()
 
 
-@st.cache_data
+@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner=False)
 def load_indicator_data(asset_id: str) -> pd.DataFrame:
     if is_r2_configured():
         try:
