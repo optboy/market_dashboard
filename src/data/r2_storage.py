@@ -4,6 +4,7 @@ import os
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from io import BytesIO
 from pathlib import Path
@@ -11,13 +12,14 @@ from typing import Any
 
 import boto3
 import botocore.auth
+import botocore.exceptions
 import pandas as pd
 from botocore.config import Config
 
 
 R2_PREFIX = "market-dashboard"
 MAX_UPLOAD_BYTES = int(os.getenv("R2_MAX_UPLOAD_BYTES", str(8 * 1024**3)))
-_R2_SERVER_DATETIME = None
+_R2_TIME_OFFSET: timedelta | None = None
 
 
 def is_r2_configured() -> bool:
@@ -51,6 +53,8 @@ def download_dataframe(key: str, attempts: int = 3) -> pd.DataFrame:
             return pd.read_parquet(BytesIO(response["Body"].read()))
         except Exception as exc:
             last_error = exc
+            if _is_request_time_skew_error(exc):
+                _refresh_r2_time_offset(exc)
             if attempt < attempts:
                 time.sleep(0.5 * attempt)
     raise RuntimeError(f"Failed to download R2 object {_full_key(key)} after {attempts} attempts: {last_error}")
@@ -94,16 +98,23 @@ def _full_key(key: str) -> str:
 
 
 def _patch_botocore_time() -> None:
-    server_datetime = _r2_server_datetime()
-    if server_datetime is None:
+    time_offset = _r2_time_offset()
+    if time_offset is None:
         return
-    botocore.auth.get_current_datetime = lambda: server_datetime
+    botocore.auth.get_current_datetime = _corrected_current_datetime
 
 
-def _r2_server_datetime():
-    global _R2_SERVER_DATETIME
-    if _R2_SERVER_DATETIME is not None:
-        return _R2_SERVER_DATETIME
+def _corrected_current_datetime(remove_tzinfo: bool = True):
+    if _R2_TIME_OFFSET is None:
+        return datetime.now(timezone.utc).replace(tzinfo=None if remove_tzinfo else timezone.utc)
+    corrected = datetime.now(timezone.utc) + _R2_TIME_OFFSET
+    return corrected.replace(tzinfo=None) if remove_tzinfo else corrected
+
+
+def _r2_time_offset() -> timedelta | None:
+    global _R2_TIME_OFFSET
+    if _R2_TIME_OFFSET is not None:
+        return _R2_TIME_OFFSET
 
     urls = [
         _setting("R2_ENDPOINT_URL"),
@@ -121,9 +132,38 @@ def _r2_server_datetime():
     if not date_header:
         return None
 
+    _R2_TIME_OFFSET = _offset_from_date_header(date_header)
+    return _R2_TIME_OFFSET
+
+
+def _refresh_r2_time_offset(exc: Exception | None = None) -> None:
+    global _R2_TIME_OFFSET
+    date_header = _date_header_from_exception(exc) if exc else None
+    if not date_header:
+        _R2_TIME_OFFSET = None
+        _r2_time_offset()
+        return
+    _R2_TIME_OFFSET = _offset_from_date_header(date_header)
+
+
+def _offset_from_date_header(date_header: str) -> timedelta:
     parsed = parsedate_to_datetime(date_header)
-    _R2_SERVER_DATETIME = parsed.replace(tzinfo=None)
-    return _R2_SERVER_DATETIME
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc) - datetime.now(timezone.utc)
+
+
+def _date_header_from_exception(exc: Exception | None) -> str | None:
+    if not isinstance(exc, botocore.exceptions.ClientError):
+        return None
+    headers = exc.response.get("ResponseMetadata", {}).get("HTTPHeaders", {})
+    return headers.get("date") or headers.get("Date")
+
+
+def _is_request_time_skew_error(exc: Exception) -> bool:
+    if not isinstance(exc, botocore.exceptions.ClientError):
+        return False
+    return exc.response.get("Error", {}).get("Code") == "RequestTimeTooSkewed"
 
 
 def _date_header_from_url(url: str) -> str | None:
