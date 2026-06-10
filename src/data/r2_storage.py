@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 import urllib.error
 import urllib.request
 from email.utils import parsedate_to_datetime
@@ -42,9 +43,17 @@ def upload_dataframe(df: pd.DataFrame, key: str) -> None:
     upload_bytes(buffer.getvalue(), key)
 
 
-def download_dataframe(key: str) -> pd.DataFrame:
-    response = _client().get_object(Bucket=_bucket(), Key=_full_key(key))
-    return pd.read_parquet(BytesIO(response["Body"].read()))
+def download_dataframe(key: str, attempts: int = 3) -> pd.DataFrame:
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            response = _client().get_object(Bucket=_bucket(), Key=_full_key(key))
+            return pd.read_parquet(BytesIO(response["Body"].read()))
+        except Exception as exc:
+            last_error = exc
+            if attempt < attempts:
+                time.sleep(0.5 * attempt)
+    raise RuntimeError(f"Failed to download R2 object {_full_key(key)} after {attempts} attempts: {last_error}")
 
 
 def upload_file(path: Path, key: str) -> None:

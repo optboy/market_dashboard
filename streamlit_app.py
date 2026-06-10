@@ -130,10 +130,13 @@ def main() -> None:
 
     scores = load_scores()
     if scores.empty:
-        st.info(
-            "아직 생성된 분석 결과가 없습니다. "
-            "`python -m scripts.build_index_scores`를 실행하면 결과가 표시됩니다."
-        )
+        if scores.attrs.get("load_error"):
+            st.error("R2 데이터를 불러오지 못했습니다. 잠시 후 `데이터 새로고침`을 눌러 다시 시도해 주세요.")
+        else:
+            st.info(
+                "아직 생성된 분석 결과가 없습니다. "
+                "`python -m scripts.build_index_scores`를 실행하면 결과가 표시됩니다."
+            )
         render_data_source_debug(scores)
         return
 
@@ -162,7 +165,6 @@ def render_cache_controls() -> None:
         st.rerun()
 
 
-@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner="R2/로컬 분석 데이터를 불러오는 중...")
 def load_scores() -> pd.DataFrame:
     return load_index_scores()
 
